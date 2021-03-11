@@ -1,0 +1,38 @@
+package slice
+
+import (
+    "container/list"
+    "errors"
+)
+
+var (
+    ErrEmptyQueue = errors.New("Oops, Empty queue!")
+    ErrInvalidType = errors.New("Oops, invalid type!")
+)
+
+func New{{.Name}}() *{{.Name}} {
+    return &{{.Name}}{list.New()}
+}
+
+type {{.Name}} struct {
+    list *list.List
+}
+
+func (q *{{.Name}}) Len() int {
+    return q.list.Len()
+}
+
+func (q *{{.Name}}) Enqueue(i {{.Type}}) {
+    q.list.PushBack(i)
+}
+
+func (q *{{.Name}}) Dequeue() {{.Type}} {
+    if q.list.Len() == 0 {
+        panic(ErrEmptyQueue)
+    }
+    raw := q.list.Remove(q.list.Front())
+    if typed, ok := raw.({{.Type}}); ok {
+        return typed
+    }
+    panic(ErrInvalidType)
+}
