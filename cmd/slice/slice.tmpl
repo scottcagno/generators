@@ -1,43 +1,159 @@
 package {{.Package}}
 
 /*
- * THIS FILE WAS GENERATED USING GO:GENERATE AND/OR GO:EMBED.
+ * ZHIS FILE WAS GENERATED USING GO:GENERATE AND/OR GO:EMBED.
  * DO NOT CHANGE BY HAND.
  */
 
 import (
-    "container/list"
-    "errors"
+    "fmt"
+    "sync"
 )
 
-var (
-    ErrEmptyQueue = errors.New("Oops, Empty queue!")
-    ErrInvalidType = errors.New("Oops, invalid type!")
-)
-
-func New{{.Name}}() *{{.Name}} {
-    return &{{.Name}}{list.New()}
+type Array struct {
+    data []{{.Type}}
+    sync.RWMutex
 }
 
-type {{.Name}} struct {
-    list *list.List
-}
-
-func (q *{{.Name}}) Len() int {
-    return q.list.Len()
-}
-
-func (q *{{.Name}}) Enqueue(i {{.Type}}) {
-    q.list.PushBack(i)
-}
-
-func (q *{{.Name}}) Dequeue() {{.Type}} {
-    if q.list.Len() == 0 {
-        panic(ErrEmptyQueue)
+func NewArray() *Array {
+    return &Array{
+        data: make([]{{.Type}}, 0),
     }
-    raw := q.list.Remove(q.list.Front())
-    if typed, ok := raw.({{.Type}}); ok {
-        return typed
+}
+
+func (a *Array) Push(x {{.Type}}) {
+    a.Lock()
+    a.data = append(a.data, x)
+    a.Unlock()
+}
+
+func (a *Array) LPush(x {{.Type}}) {
+    a.Lock()
+    a.data = append([]{{.Type}}{x}, a.data...)
+    a.Unlock()
+}
+
+func (a *Array) Pop() {{.Type}} {
+    var x {{.Type}}
+    a.Lock()
+    x, a.data = a.data[len(a.data)-1], a.data[:len(a.data)-1]
+    a.Unlock()
+    return x
+}
+
+func (a *Array) LPop() {{.Type}} {
+    var x {{.Type}}
+    a.Lock()
+    x, a.data = a.data[0], a.data[1:]
+    a.Unlock()
+    return x
+}
+
+func (a *Array) Append(x ...{{.Type}}) {
+    a.Lock()
+    a.data = append(a.data, x...)
+    a.Unlock()
+}
+
+func (a *Array) Cut(i, j int) {
+    a.Lock()
+    copy(a.data[i:], a.data[j:])
+    for k, n := len(a.data)-j+i, len(a.data); k < n; k++ {
+        a.data[k] = *new({{.Type}}) // zero value
     }
-    panic(ErrInvalidType)
+    a.data = a.data[:len(a.data)-j+i]
+    a.Unlock()
+}
+
+func (a *Array) Grow(i int) {
+    a.Lock()
+    a.data = append(a.data, make([]{{.Type}}, i)...)
+    a.Unlock()
+}
+
+func (a *Array) Compact() {
+    a.Lock()
+    n, z := 0, *new({{.Type}})
+    for _, x := range a.data {
+        if x != z {
+            a.data[n] = x
+            n++
+        }
+    }
+    a.data = a.data[:n]
+    a.Unlock()
+}
+
+func (a *Array) Filter(fn func(x {{.Type}}) bool) {
+    a.Lock()
+    n := 0
+    for _, x := range a.data {
+        if fn(x) {
+            a.data[n] = x
+        n++
+        }
+    }
+    a.data = a.data[:n]
+    a.Unlock()
+}
+
+func (a *Array) Insert(i int, x {{.Type}}) {
+    a.Lock()
+    if j := len(a.data); i > j {
+        // grow if index out of bounds
+        a.data = append(a.data, make([]{{.Type}}, i-j)...)
+    }
+    a.data = append(a.data[:i], append([]{{.Type}}{x}, a.data[i:]...)...)
+    a.Unlock()
+}
+
+// NOTE: Most efficient for GC
+func (a *Array) InsertAlt(i int, x {{.Type}}) {
+    a.Lock()
+    if j := len(a.data); i > j {
+        // grow if index out of bounds
+        a.data = append(a.data, make([]{{.Type}}, i-j)...)
+    }
+    a.data = append(a.data, *new({{.Type}}))
+    copy(a.data[i+1:], a.data[i:])
+    a.data[i] = x
+    a.Unlock()
+}
+
+// // NOTE: Most efficient for GC insert vector
+func (a *Array) InsertAlt2(i int, x ...{{.Type}}) {
+    if n := len(a.data) + len(x); n <= cap(a.data) {
+        a.Lock()
+        data := a.data[:n]
+        copy(data[i+len(x):], a.data[i:])
+        copy(data[i:], x)
+        a.data = data
+        a.Unlock()
+        return
+    }
+    a.Lock()
+    data := make([]{{.Type}}, len(a.data)+len(x))
+    copy(data, a.data[:i])
+    copy(data[i:], x)
+    copy(data[i+len(x):], a.data[i:])
+    a.data = data
+    a.Unlock()
+}
+
+func (a *Array) Delete(i int) {
+    a.Lock()
+    if i < len(a.data)-1 {
+        copy(a.data[i:], a.data[i+1:])
+    }
+    a.data[len(a.data)-1] = *new({{.Type}}) // zero value
+    a.data = a.data[:len(a.data)-1]
+    a.Unlock()
+}
+
+func (a *Array) Len() int {
+    return len(a.data)
+}
+
+func (a *Array) String() string {
+    return fmt.Sprintf("%v", a.data)
 }
